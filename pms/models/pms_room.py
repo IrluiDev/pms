@@ -23,7 +23,7 @@ class PmsRoom(models.Model):
         required=True,
     )
     active = fields.Boolean(
-        string="Active", help="Determines if room is activeeee", default=True
+        string="Active", help="Determines if room is active", default=True
     )
     sequence = fields.Integer(
         string="Sequence",
