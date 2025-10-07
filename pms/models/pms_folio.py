@@ -43,7 +43,6 @@ class PmsFolio(models.Model):
         comodel_name="pms.property",
         required=True,
         index=True,
-        default=lambda self: self.env.user.get_active_property_ids()[0],
         check_pms_properties=True,
     )
     partner_id = fields.Many2one(
@@ -484,12 +483,6 @@ class PmsFolio(models.Model):
         store=True,
         compute="_compute_amount_all",
         tracking=True,
-    )
-    max_reservation_priority = fields.Integer(
-        string="Max reservation priority on the entire folio",
-        help="Max reservation priority on the entire folio",
-        compute="_compute_max_reservation_priority",
-        store=True,
     )
     invoice_status = fields.Selection(
         string="Invoice Status",
@@ -1368,12 +1361,6 @@ class PmsFolio(models.Model):
         }
         return vals
 
-    @api.depends("reservation_ids", "reservation_ids.priority")
-    def _compute_max_reservation_priority(self):
-        for record in self.filtered("reservation_ids"):
-            reservation_priors = record.reservation_ids.mapped("priority")
-            record.max_reservation_priority = max(reservation_priors)
-
     def _compute_checkin_partner_count(self):
         for record in self:
             if (
@@ -1493,11 +1480,9 @@ class PmsFolio(models.Model):
     @api.model
     def create(self, vals):
         if vals.get("name", _("New")) == _("New") or "name" not in vals:
-            pms_property_id = (
-                self.env.user.get_active_property_ids()[0]
-                if "pms_property_id" not in vals
-                else vals["pms_property_id"]
-            )
+            if "pms_property_id" not in vals:
+                raise UserError(_("Property is required"))
+            pms_property_id = vals.get("pms_property_id")
             pms_property = self.env["pms.property"].browse(pms_property_id)
             vals["name"] = pms_property.folio_sequence_id._next_do()
         result = super(PmsFolio, self).create(vals)
@@ -2094,7 +2079,10 @@ class PmsFolio(models.Model):
         (making sure to call super() to establish a clean extension chain).
         """
         self.ensure_one()
-        journal = self.pms_property_id._get_folio_default_journal(partner_invoice_id)
+        journal = self.pms_property_id._get_folio_default_journal(
+            partner_invoice_id=partner_invoice_id,
+            room_ids=self.reservation_ids.mapped("reservation_line_ids.room_id.id"),
+        )
         if not journal:
             journal = (
                 self.env["account.move"]
@@ -2196,7 +2184,7 @@ class PmsFolio(models.Model):
         # Review: force to autoreconcile payment with invoices already created
         pay.flush()
         for move in folio.move_ids:
-            move._autoreconcile_folio_payments()
+            move.sudo()._autoreconcile_folio_payments()
 
         # Automatic register payment in cash register
         # TODO: cash_register to avoid flow in the new api (delete it in the future)

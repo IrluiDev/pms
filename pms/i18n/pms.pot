@@ -1194,6 +1194,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:pms.field_pms_room__active
 #: model:ir.model.fields,field_description:pms.field_pms_room_type__active
 #: model:ir.model.fields,field_description:pms.field_pms_room_type_class__active
+#: model:ir.model.fields,field_description:pms.field_pms_sale_channel__active
 #: model:ir.model.fields,field_description:pms.field_pms_team_member__active
 msgid "Active"
 msgstr ""
@@ -1642,15 +1643,23 @@ msgid "Analytic Tags"
 msgstr ""
 
 #. module: pms
-#: model:ir.model.fields,field_description:pms.field_folio_sale_line__analytic_line_ids
-#: model:ir.model.fields,field_description:pms.field_pms_reservation__analytic_line_ids
-msgid "Analytic lines"
-msgstr ""
-
-#. module: pms
 #: model_terms:ir.ui.view,arch_db:pms.massive_changes_wizard
 #: model_terms:ir.ui.view,arch_db:pms.product_pricelist_item_view_tree
 msgid "Applicable on"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_pms_room_type__tourist_tax_max_age
+#: model:ir.model.fields,help:pms.field_product_product__tourist_tax_max_age
+#: model:ir.model.fields,help:pms.field_product_template__tourist_tax_max_age
+msgid "Applies only to guests up to this age"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_pms_room_type__tourist_tax_min_age
+#: model:ir.model.fields,help:pms.field_product_product__tourist_tax_min_age
+#: model:ir.model.fields,help:pms.field_product_template__tourist_tax_min_age
+msgid "Applies only to guests with this age or older"
 msgstr ""
 
 #. module: pms
@@ -1727,6 +1736,13 @@ msgid "Apply From"
 msgstr ""
 
 #. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__tourist_tax_apply_from_night
+#: model:ir.model.fields,field_description:pms.field_product_product__tourist_tax_apply_from_night
+#: model:ir.model.fields,field_description:pms.field_product_template__tourist_tax_apply_from_night
+msgid "Apply From Night"
+msgstr ""
+
+#. module: pms
 #: model:ir.model.fields,field_description:pms.field_wizard_folio_changes__apply_price
 msgid "Apply Price update"
 msgstr ""
@@ -1740,8 +1756,20 @@ msgid "Apply Pricelist"
 msgstr ""
 
 #. module: pms
+#: model:ir.model.fields,field_description:pms.field_account_journal__room_filter_ids
+msgid "Apply Rooms"
+msgstr ""
+
+#. module: pms
 #: model:ir.model.fields,field_description:pms.field_wizard_folio_changes__change_to_date
 msgid "Apply To"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__tourist_tax_apply_to_night
+#: model:ir.model.fields,field_description:pms.field_product_product__tourist_tax_apply_to_night
+#: model:ir.model.fields,field_description:pms.field_product_template__tourist_tax_apply_to_night
+msgid "Apply Until Night"
 msgstr ""
 
 #. module: pms
@@ -3425,11 +3453,6 @@ msgid "Current state of this reservation"
 msgstr ""
 
 #. module: pms
-#: model:ir.model.fields,field_description:pms.field_folio_sale_line__product_custom_attribute_value_ids
-msgid "Custom Values"
-msgstr ""
-
-#. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_reservation__partner_id
 #: model:ir.model.fields,field_description:pms.field_wizard_folio_changes__new_partner_id
 #: model_terms:ir.ui.view,arch_db:pms.pms_folio_view_search
@@ -3498,6 +3521,18 @@ msgstr ""
 #: model:ir.model.fields,field_description:pms.field_pms_several_partners_wizard__possible_existing_customer_ids
 #: model:ir.ui.menu,name:pms.pms_customer_meu
 msgid "Customers"
+msgstr ""
+
+#. module: pms
+#: model_terms:ir.ui.view,arch_db:pms.product_template_view_form
+msgid "Daily Limit"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__property_daily_limits
+#: model:ir.model.fields,field_description:pms.field_product_product__property_daily_limits
+#: model:ir.model.fields,field_description:pms.field_product_template__property_daily_limits
+msgid "Daily Limits per Property"
 msgstr ""
 
 #. module: pms
@@ -4136,13 +4171,6 @@ msgid "Driving License"
 msgstr ""
 
 #. module: pms
-#. openerp-web
-#: code:addons/pms/static/src/xml/pms_base_templates.xml:0
-#, python-format
-msgid "Dropdown menu"
-msgstr ""
-
-#. module: pms
 #: model:ir.model,name:pms.model_pms_booking_duplicate
 msgid "Duplicate Booking"
 msgstr ""
@@ -4212,6 +4240,13 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_property__employee
 msgid "Employee"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__tourist_tax_date_end
+#: model:ir.model.fields,field_description:pms.field_product_product__tourist_tax_date_end
+#: model:ir.model.fields,field_description:pms.field_product_template__tourist_tax_date_end
+msgid "End Date (Annual)"
 msgstr ""
 
 #. module: pms
@@ -4356,6 +4391,11 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,field_description:pms.field_ir_pms_property__field_id
 msgid "Field"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_ir_pms_property__field_name
+msgid "Field Name"
 msgstr ""
 
 #. module: pms
@@ -5441,6 +5481,13 @@ msgid "Indicates if that product is a extra bed, add +1 capacity in the room"
 msgstr ""
 
 #. module: pms
+#: model:ir.model.fields,help:pms.field_pms_room_type__is_tourist_tax
+#: model:ir.model.fields,help:pms.field_product_product__is_tourist_tax
+#: model:ir.model.fields,help:pms.field_product_template__is_tourist_tax
+msgid "Indicates if that product is a tourist tax"
+msgstr ""
+
+#. module: pms
 #: model:ir.model.fields,help:pms.field_pms_room_type__is_pms_available
 #: model:ir.model.fields,help:pms.field_product_product__is_pms_available
 #: model:ir.model.fields,help:pms.field_product_template__is_pms_available
@@ -5963,6 +6010,13 @@ msgid ""
 msgstr ""
 
 #. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__is_tourist_tax
+#: model:ir.model.fields,field_description:pms.field_product_product__is_tourist_tax
+#: model:ir.model.fields,field_description:pms.field_product_template__is_tourist_tax
+msgid "Is tourist tax"
+msgstr ""
+
+#. module: pms
 #: model:ir.model.fields,help:pms.field_pms_wizard_reservation_lines_split__allowed_room_ids
 msgid "It contains all available rooms for this line"
 msgstr ""
@@ -6074,6 +6128,11 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_property__journal_item_count
 msgid "Journal Items"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_res_company__self_billed_journal_id
+msgid "Journal used to create self billing"
 msgstr ""
 
 #. module: pms
@@ -6510,12 +6569,6 @@ msgid "Max Amount Simplified Invoice"
 msgstr ""
 
 #. module: pms
-#: model:ir.model.fields,field_description:pms.field_pms_folio__max_reservation_priority
-#: model:ir.model.fields,help:pms.field_pms_folio__max_reservation_priority
-msgid "Max reservation priority on the entire folio"
-msgstr ""
-
-#. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_availability_plan_rule__max_avail
 #: model:ir.model.fields,field_description:pms.field_pms_massive_changes_wizard__max_avail
 msgid "Max. Availability"
@@ -6560,6 +6613,13 @@ msgstr ""
 #. module: pms
 #: model_terms:ir.ui.view,arch_db:pms.pms_cancelation_rule_form
 msgid "Max. days InTime before Checkin"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__tourist_tax_max_age
+#: model:ir.model.fields,field_description:pms.field_product_product__tourist_tax_max_age
+#: model:ir.model.fields,field_description:pms.field_product_template__tourist_tax_max_age
+msgid "Maximum Age"
 msgstr ""
 
 #. module: pms
@@ -6682,6 +6742,13 @@ msgid "Min. Stay can't be less than zero"
 msgstr ""
 
 #. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__tourist_tax_min_age
+#: model:ir.model.fields,field_description:pms.field_product_product__tourist_tax_min_age
+#: model:ir.model.fields,field_description:pms.field_product_template__tourist_tax_min_age
+msgid "Minimum Age"
+msgstr ""
+
+#. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_room_type__orderpoint_ids
 msgid "Minimum Stock Rules"
 msgstr ""
@@ -6721,6 +6788,11 @@ msgstr ""
 #: model:ir.model.fields,field_description:pms.field_ir_pms_property__model_id
 #: model_terms:ir.ui.view,arch_db:pms.advanced_filters_wizard
 msgid "Model"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_ir_pms_property__model_name
+msgid "Model Name"
 msgstr ""
 
 #. module: pms
@@ -6920,6 +6992,20 @@ msgstr ""
 #: model:ir.model.fields,field_description:pms.field_pms_reservation__activity_type_id
 #: model:ir.model.fields,field_description:pms.field_pms_room_type__activity_type_id
 msgid "Next Activity Type"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_pms_room_type__tourist_tax_apply_from_night
+#: model:ir.model.fields,help:pms.field_product_product__tourist_tax_apply_from_night
+#: model:ir.model.fields,help:pms.field_product_template__tourist_tax_apply_from_night
+msgid "Night number the rule starts applying (e.g., 1 = first night)"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_pms_room_type__tourist_tax_apply_to_night
+#: model:ir.model.fields,help:pms.field_product_product__tourist_tax_apply_to_night
+#: model:ir.model.fields,help:pms.field_product_template__tourist_tax_apply_to_night
+msgid "Night number the rule stops applying (optional)"
 msgstr ""
 
 #. module: pms
@@ -8025,8 +8111,6 @@ msgstr ""
 
 #. module: pms
 #: model:ir.model.fields,help:pms.field_pms_room_type__list_price
-#: model:ir.model.fields,help:pms.field_product_product__list_price
-#: model:ir.model.fields,help:pms.field_product_template__list_price
 msgid "Price at which the product is sold to customers."
 msgstr ""
 
@@ -8166,6 +8250,7 @@ msgstr ""
 
 #. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_availability_plan__pms_pricelist_ids
+#: model:ir.model.fields,field_description:pms.field_pms_board_service_room_type__pricelist_ids
 #: model:ir.model.fields,field_description:pms.field_pms_sale_channel__product_pricelist_ids
 #: model:ir.ui.menu,name:pms.pricelist_menu
 msgid "Pricelists"
@@ -8184,6 +8269,11 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,help:pms.field_pms_availability_plan__pms_pricelist_ids
 msgid "Pricelists of the availability plan "
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_pms_board_service_room_type__pricelist_ids
+msgid "Pricelists where this Board Service is available"
 msgstr ""
 
 #. module: pms
@@ -8215,15 +8305,9 @@ msgid "Print in cardex"
 msgstr ""
 
 #. module: pms
-#: model:ir.model.fields,field_description:pms.field_pms_reservation__priority
 #: model:ir.model.fields,field_description:pms.field_res_country__priority
 #: model:ir.model.fields,field_description:pms.field_res_partner_id_category__priority
 msgid "Priority"
-msgstr ""
-
-#. module: pms
-#: model:ir.model.fields,help:pms.field_pms_reservation__priority
-msgid "Priority of a reservation"
 msgstr ""
 
 #. module: pms
@@ -8456,6 +8540,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:pms.field_pms_team_member__pms_property_id
 #: model_terms:ir.ui.view,arch_db:pms.pms_checkin_partner_view_search
 #: model_terms:ir.ui.view,arch_db:pms.pms_folio_view_search
+#: model_terms:ir.ui.view,arch_db:pms.pms_reservation_view_form
 #: model_terms:ir.ui.view,arch_db:pms.pms_reservation_view_search
 #: model_terms:ir.ui.view,arch_db:pms.pms_room_type_view_search
 #: model_terms:ir.ui.view,arch_db:pms.pms_room_view_search
@@ -8519,6 +8604,12 @@ msgstr ""
 #. module: pms
 #: model_terms:ir.ui.view,arch_db:pms.pms_ubication_view_form
 msgid "Property Ubication"
+msgstr ""
+
+#. module: pms
+#: code:addons/pms/models/pms_folio.py:0
+#, python-format
+msgid "Property is required"
 msgstr ""
 
 #. module: pms
@@ -8772,13 +8863,6 @@ msgstr ""
 #. module: pms
 #: model_terms:ir.ui.view,arch_db:pms.pms_reservation_view_form
 msgid "Recompute all prices based on this pricelist"
-msgstr ""
-
-#. module: pms
-#: model:ir.actions.server,name:pms.priority_reservations_ir_actions_server
-#: model:ir.cron,cron_name:pms.priority_reservations
-#: model:ir.cron,name:pms.priority_reservations
-msgid "Recompute priority on reservations"
 msgstr ""
 
 #. module: pms
@@ -9274,6 +9358,7 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields.selection,name:pms.selection__pms_massive_changes_wizard__apply_pricelists_on__room_types
 #: model:ir.ui.menu,name:pms.menu_open_pms_room_type_form_tree
+#: model_terms:ir.ui.view,arch_db:pms.account_journal_view_form
 msgid "Room Types"
 msgstr ""
 
@@ -9308,6 +9393,16 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,help:pms.field_pms_reservation_duplicate__preferred_room_id
 msgid "Room reserved"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_account_journal__allowed_room_ids
+msgid "Room to filter the room in the reservation"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_account_journal__room_filter_ids
+msgid "Room to filter the room types in the reservation"
 msgstr ""
 
 #. module: pms
@@ -9382,6 +9477,11 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:pms.pms_property_views_form
 #: model_terms:ir.ui.view,arch_db:pms.pms_reservation_view_bottom_tree
 msgid "Rooms"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_account_journal__allowed_room_ids
+msgid "Rooms Filter allowed"
 msgstr ""
 
 #. module: pms
@@ -9629,8 +9729,6 @@ msgstr ""
 
 #. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_room_type__list_price
-#: model:ir.model.fields,field_description:pms.field_product_product__list_price
-#: model:ir.model.fields,field_description:pms.field_product_template__list_price
 msgid "Sales Price"
 msgstr ""
 
@@ -9789,6 +9887,16 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,field_description:pms.field_pms_property__self
 msgid "Self"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_res_company__self_billed_journal_id
+msgid "Self billed journal"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,field_description:pms.field_res_company__self_billed_tax_ids
+msgid "Self billed taxes"
 msgstr ""
 
 #. module: pms
@@ -10229,6 +10337,13 @@ msgid ""
 msgstr ""
 
 #. module: pms
+#: model:ir.model.fields,field_description:pms.field_pms_room_type__tourist_tax_date_start
+#: model:ir.model.fields,field_description:pms.field_product_product__tourist_tax_date_start
+#: model:ir.model.fields,field_description:pms.field_product_template__tourist_tax_date_start
+msgid "Start Date (Annual)"
+msgstr ""
+
+#. module: pms
 #: model:ir.model.fields,field_description:pms.field_product_pricelist_item__date_start_consumption
 msgid "Start Date Consumption"
 msgstr ""
@@ -10450,13 +10565,6 @@ msgid "Swap rooms"
 msgstr ""
 
 #. module: pms
-#. openerp-web
-#: code:addons/pms/static/src/xml/pms_base_templates.xml:0
-#, python-format
-msgid "Switch to this property"
-msgstr ""
-
-#. module: pms
 #: model:ir.model,name:pms.model_ir_config_parameter
 msgid "System Parameter"
 msgstr ""
@@ -10522,6 +10630,11 @@ msgstr ""
 #. module: pms
 #: model:ir.model.fields,help:pms.field_folio_advance_payment_inv__deposit_taxes_id
 msgid "Taxes used for deposits"
+msgstr ""
+
+#. module: pms
+#: model:ir.model.fields,help:pms.field_res_company__self_billed_tax_ids
+msgid "Taxes used to create self billing"
 msgstr ""
 
 #. module: pms
@@ -11643,6 +11756,11 @@ msgstr ""
 #: model:ir.model.fields,help:pms.field_pms_service__price_total
 #: model:ir.model.fields,help:pms.field_pms_service_line__price_day_total
 msgid "Total price with taxes"
+msgstr ""
+
+#. module: pms
+#: model_terms:ir.ui.view,arch_db:pms.product_template_view_form
+msgid "Tourist Tax"
 msgstr ""
 
 #. module: pms

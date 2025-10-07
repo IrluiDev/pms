@@ -99,7 +99,7 @@ class TestPmsReservations(TestPms):
         )
         cls.agency1 = cls.env["res.partner"].create(
             {
-                "name": "partner1",
+                "firstname": "partner1",
                 "is_agency": True,
                 "invoice_to_agency": "always",
                 "default_commission": 15,
@@ -711,818 +711,6 @@ class TestPmsReservations(TestPms):
             )
             reservation.flush()
 
-    @freeze_time("2012-01-14")
-    def test_to_assign_priority_reservation(self):
-        """
-        To assign reservation must have priority = 1
-        ------
-        Create a reservation with only room_type (to_assign = True),
-        regardless of the rest of the fields the priority must be 1
-
-        NOTE:
-        WORK FLOW PRIORITY COMPUTE
-        Check reservation priority
-        --------
-        1 - TO ASSIGN, ARRIVAL DELAYED, DEPARTURE DELAYED (= 1)
-        2 - CANCELLED with pending amount (= 2)
-        3 - DONE with pending amount (= 3)
-        4 - ONBOARD with pending amount (= days for checkout)
-        5 - CONFIRM/DRAFT with arrival in less than 3 days (= 2 * days for checkin)
-        6 - ONBOARD all paid (= 3 * days for checkout)
-        7 - DONE with days from checkout < 1 (= 6)
-        8 - CONFIRM/DRAFT with arrival between 3 and 20 days (= 3 * days for checkin)
-        9 - CONFIRM/DRAFT with arrival in more than 20 days (= 4 * days for checkin)
-        10 - DONE with days from checkout < 15 (= 5 * days from checkout)
-        11 - DONE with days from checkout between 15 and 90 included (= 10 * days from checkout)
-        12 - DONE with days from checkout > 90 (= 100 * days from checkout)
-        """
-        # ARRANGE
-        expected_priority = 1
-
-        # ACT
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today() + datetime.timedelta(days=30),
-                "checkout": fields.date.today() + datetime.timedelta(days=31),
-                "room_type_id": self.room_type_double.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a reservation to be assigned \
-                should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("2012-01-14")
-    def test_arrival_delayed_priority_reservation(self):
-        """
-        Arrival delayed reservation must have priority = 1
-        ------
-        Create a reservation with checkin date yesterday, and without checkin action,
-        regardless of the rest of the fields the priority must be 1
-        """
-        # ARRANGE
-        expected_priority = 1
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today() + datetime.timedelta(days=-1),
-                "checkout": fields.date.today() + datetime.timedelta(days=1),
-                "preferred_room_id": self.room1.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-
-        # ACT
-        res.auto_arrival_delayed()
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a arrival delayed reservation \
-                should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    # @freeze_time("1981-11-10")
-    # def test_departure_delayed_priority_reservation(self):
-    #     """
-    #     To departure delayed reservation must have priority = 1
-    #     ------
-    #     Create a reservation and make the work flow to onboard state,
-    #     using jump dates, we make the reservation should have left yesterday,
-    #     regardless of the rest of the fields the priority must be 1
-    #     """
-    #     # ARRANGE
-    #     expected_priority = 1
-    #     freezer = freeze_time("1981-11-08")
-    #     freezer.start()
-    #     res = self.env["pms.reservation"].create(
-    #         {
-    #             "checkin": fields.date.today(),
-    #             "checkout": fields.date.today() + datetime.timedelta(days=1),
-    #             "preferred_room_id": self.room2.id,
-    #             "partner_id": self.partner1.id,
-    #             "pms_property_id": self.pms_property1.id,
-    #         }
-    #     )
-    #     host1 = self.env["res.partner"].create(
-    #         {
-    #             "firstname": "Pepe",
-    #             "lastname": "Paz",
-    #             "email": "pepe@example.com",
-    #             "birthdate_date": "1995-12-10",
-    #             "gender": "male",
-    #         }
-    #     )
-    #     checkin1 = self.env["pms.checkin.partner"].create(
-    #         {
-    #             "partner_id": host1.id,
-    #             "reservation_id": res.id,
-    #             "document_expedition_date": fields.date.today()
-    #             + datetime.timedelta(days=665),
-    #         }
-    #     )
-    #     checkin1.action_on_board()
-    #     freezer.stop()
-
-    #     # ACT
-    #     res.auto_departure_delayed()
-    #     computed_priority = res.priority
-
-    #     # ASSERT
-    #     error_msm = (
-    #         (
-    #             "The priority of a departure delayed reservation \
-    #             should be %d and this is %d"
-    #         )
-    #         % (expected_priority, computed_priority)
-    #     )
-
-    #     self.assertEqual(
-    #         computed_priority,
-    #         expected_priority,
-    #         error_msm,
-    #     )
-
-    @freeze_time("2012-01-14")
-    def _test_cancel_pending_amount_priority_reservation(self):
-        """
-        Cancelled with pending payments reservation must have priority = 2
-        ------
-        create a reservation and cancel it ensuring that there are
-        pending payments in it, the priority must be 2
-        """
-        # ARRANGE
-        expected_priority = 2
-        self.room_type_double.list_price = 25
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today() + datetime.timedelta(days=55),
-                "checkout": fields.date.today() + datetime.timedelta(days=56),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-
-        # ACT
-        res.action_cancel()
-        res.flush()
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a cancelled reservation with pending amount \
-                should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("1981-11-10")
-    def test_done_with_pending_amountpriority_reservation(self):
-        """
-        Done with pending amount reservation must have priority = 3
-        ------
-        Create a reservation and make the work flow to onboard - done state,
-        using jump dates, we make the checkout reservation with pending amount,
-        regardless of the rest of the fields the priority must be 3
-        """
-        # ARRANGE
-        expected_priority = 3
-        freezer = freeze_time("1981-10-08")
-        freezer.start()
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=1),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-        checkin1.action_on_board()
-
-        freezer.stop()
-        freezer = freeze_time("1981-10-09")
-        freezer.start()
-
-        res.action_reservation_checkout()
-
-        # ACT
-        res.auto_departure_delayed()
-        computed_priority = res.priority
-        freezer.stop()
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a done reservation with pending amount\
-                should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("1981-11-10")
-    def test_onboard_with_pending_amount_priority_reservation(self):
-        """
-        Onboard with pending amount reservation must have priority = days for checkout
-        ------
-        Create a reservation with 3 nights and make the work flow to onboard,
-        using jump dates, we set today in 2 nights before checkout,
-        regardless of the rest of the fields the priority must be 2
-        """
-        # ARRANGE
-        expected_priority = 3
-        freezer = freeze_time("1981-10-08")
-        freezer.start()
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=3),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-
-        # ACT
-        checkin1.action_on_board()
-        computed_priority = res.priority
-        freezer.stop()
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a onboard with payment amount reservation \
-                should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("2012-01-14")
-    def test_confirm_arriva_lt_3_days_priority_reservation(self):
-        """
-        Confirm reservation with arrival in less than 3 days, priority = 2 * days for checkout
-        ------
-        Create a reservation with checkin date on 2 days
-        regardless of the rest of the fields the priority must be 2 * 2 = 4
-        """
-        # ARRANGE
-        expected_priority = 4
-
-        # ACT
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today() + datetime.timedelta(days=2),
-                "checkout": fields.date.today() + datetime.timedelta(days=5),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a confirm with less than 3 days for arrival \
-                reservation should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("2012-01-14")
-    def test_onboard_all_pay_priority_reservation(self):
-        """
-        Onboard with all pay reservation must have priority = 3 * days for checkout
-        ------
-        Create a reservation with 3 nights and make the work flow to onboard,
-        using jump dates, we set today in 2 nights before checkout,
-        regardless of the rest of the fields the priority must be 3 * 3 = 9
-        """
-        # ARRANGE
-        expected_priority = 9
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=3),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-
-        # ACT
-        checkin1.action_on_board()
-        # REVIEW: set to 0 the price to avoid make the payment
-        # (config account company issues in test)
-        res.reservation_line_ids.write({"price": 0})
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of onboard all pay reservation \
-                should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("1981-11-10")
-    def test_done_yesterday_all_paid_amountpriority_reservation(self):
-        """
-        Checkout yesterday without pending amount reservation must have priority = 6
-        ------
-        Create a reservation and make the work flow to onboard - done state,
-        using jump dates, we make the checkout reservation without pending amount,
-        and set today 1 day after,
-        regardless of the rest of the fields the priority must be 6
-        """
-        # ARRANGE
-        expected_priority = 6
-        freezer = freeze_time("1981-10-08")
-        freezer.start()
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=1),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-        checkin1.action_on_board()
-
-        freezer.stop()
-        freezer = freeze_time("1981-10-09")
-        freezer.start()
-
-        res.action_reservation_checkout()
-        # REVIEW: set to 0 the price to avoid make the payment
-        # (config account company issues in test)
-        res.reservation_line_ids.write({"price": 0})
-
-        # ACT
-        freezer.stop()
-        freezer = freeze_time("1981-10-10")
-        freezer.start()
-
-        res.update_daily_priority_reservation()
-        computed_priority = res.priority
-        freezer.stop()
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a done reservation without pending amount\
-                and checkout yesterday should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("2012-01-14")
-    def test_confirm_arriva_bt_3_and_20_days_priority_reservation(self):
-        """
-        Confirm reservation with arrival between 3 and 20 days, priority = 3 * days for checkout
-        ------
-        Create a reservation with checkin date on 15 days
-        regardless of the rest of the fields the priority must be 3 * 15 = 45
-        """
-        # ARRANGE
-        expected_priority = 45
-
-        # ACT
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today() + datetime.timedelta(days=15),
-                "checkout": fields.date.today() + datetime.timedelta(days=20),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a confirm with between 3 and 20 days for arrival \
-                reservation should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("2012-01-14")
-    def test_confirm_arrival_more_than_20_days_priority_reservation(self):
-        """
-        Confirm reservation with arrival more than 20 days, priority = 4 * days for checkout
-        ------
-        Create a reservation with checkin date on 21 days
-        regardless of the rest of the fields the priority must be 4 * 21 = 84
-        """
-        # ARRANGE
-        expected_priority = 84
-
-        # ACT
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today() + datetime.timedelta(days=21),
-                "checkout": fields.date.today() + datetime.timedelta(days=25),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        computed_priority = res.priority
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a confirm with more than 20 days for arrival \
-                reservation should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("1981-11-10")
-    def test_done_checkout_lt_15_days_before_all_paid_priority_reservation(self):
-        """
-        Checkout less than 15 days before without pending amount reservation
-        must have priority = 5 * days from checkout
-        ------
-        Create a reservation and make the work flow to onboard - done state,
-        using jump dates, we make the checkout reservation without pending amount,
-        and set today 6 day after,
-        regardless of the rest of the fields the priority must be 6 * 5 = 30
-        """
-        # ARRANGE
-        expected_priority = 30
-        freezer = freeze_time("1981-10-09")
-        freezer.start()
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=1),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-        checkin1.action_on_board()
-
-        freezer.stop()
-        freezer = freeze_time("1981-10-10")
-        freezer.start()
-
-        res.action_reservation_checkout()
-        # REVIEW: set to 0 the price to avoid make the payment
-        # (config account company issues in test)
-        res.reservation_line_ids.write({"price": 0})
-
-        # ACT
-        freezer.stop()
-        freezer = freeze_time("1981-10-16")
-        freezer.start()
-
-        res.update_daily_priority_reservation()
-        computed_priority = res.priority
-        freezer.stop()
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a done reservation without pending amount\
-                and checkout less than 15 days before should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("1981-11-10")
-    def test_done_checkout_bt_30_and_90_days_before_all_paid_priority_reservation(self):
-        """
-        Checkout between 30 and 90 days before without pending amount reservation
-        must have priority = 10 * days from checkout
-        ------
-        Create a reservation and make the work flow to onboard - done state,
-        using jump dates, we make the checkout reservation without pending amount,
-        and set today 45 day after,
-        regardless of the rest of the fields the priority must be 10 * 45 = 450
-        """
-        # ARRANGE
-        expected_priority = 450
-        freezer = freeze_time("1981-10-09")
-        freezer.start()
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=1),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-        checkin1.action_on_board()
-
-        freezer.stop()
-        freezer = freeze_time("1981-10-10")
-        freezer.start()
-
-        res.action_reservation_checkout()
-        # REVIEW: set to 0 the price to avoid make the payment
-        # (config account company issues in test)
-        res.reservation_line_ids.write({"price": 0})
-
-        # ACT
-        freezer.stop()
-        freezer = freeze_time("1981-11-24")
-        freezer.start()
-
-        res.update_daily_priority_reservation()
-        computed_priority = res.priority
-        freezer.stop()
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a done reservation without pending amount\
-                and checkout between 30 and 90 days before should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
-    @freeze_time("1981-11-10")
-    def test_done_checkout_mt_90_days_before_all_paid_priority_reservation(self):
-        """
-        Checkout more than 90 days before without pending amount reservation
-        must have priority = 100 * days from checkout
-        ------
-        Create a reservation and make the work flow to onboard - done state,
-        using jump dates, we make the checkout reservation without pending amount,
-        and set today 91 day after,
-        regardless of the rest of the fields the priority must be 100 * 91 = 9100
-        """
-        # ARRANGE
-        expected_priority = 9100
-        freezer = freeze_time("1981-10-09")
-        freezer.start()
-        res = self.env["pms.reservation"].create(
-            {
-                "checkin": fields.date.today(),
-                "checkout": fields.date.today() + datetime.timedelta(days=1),
-                "preferred_room_id": self.room2.id,
-                "partner_id": self.partner1.id,
-                "pms_property_id": self.pms_property1.id,
-                "sale_channel_origin_id": self.sale_channel_direct.id,
-            }
-        )
-        host1 = self.env["res.partner"].create(
-            {
-                "firstname": "Pepe",
-                "lastname": "Paz",
-                "email": "pepe@example.com",
-                "birthdate_date": "1995-12-10",
-                "gender": "male",
-            }
-        )
-        checkin1 = self.env["pms.checkin.partner"].create(
-            {
-                "partner_id": host1.id,
-                "reservation_id": res.id,
-                "document_expedition_date": fields.date.today()
-                + datetime.timedelta(days=665),
-            }
-        )
-        checkin1.action_on_board()
-
-        freezer.stop()
-        freezer = freeze_time("1981-10-10")
-        freezer.start()
-
-        res.action_reservation_checkout()
-        # REVIEW: set to 0 the price to avoid make the payment
-        # (config account company issues in test)
-        res.reservation_line_ids.write({"price": 0})
-
-        # ACT
-        freezer.stop()
-        freezer = freeze_time("1982-01-09")
-        freezer.start()
-
-        res.update_daily_priority_reservation()
-        computed_priority = res.priority
-        freezer.stop()
-
-        # ASSERT
-        error_msm = (
-            (
-                "The priority of a done reservation without pending amount\
-                and checkout more than 90 days before should be %d and this is %d"
-            )
-            % (expected_priority, computed_priority)
-        )
-
-        self.assertEqual(
-            computed_priority,
-            expected_priority,
-            error_msm,
-        )
-
     def test_reservation_action_assign(self):
         """
         Checks the correct operation of the assign method
@@ -1666,7 +854,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         host = self.env["res.partner"].create(
             {
-                "name": "Miguel",
+                "firstname": "Miguel",
                 "mobile": "654667733",
                 "email": "miguel@example.com",
                 "birthdate_date": "1995-12-10",
@@ -1679,6 +867,7 @@ class TestPmsReservations(TestPms):
                 "name": "30065089H",
                 "valid_from": datetime.date.today(),
                 "partner_id": host.id,
+                "country_id": self.env.ref("base.es").id,
             }
         )
         r1 = self.env["pms.reservation"].create(
@@ -1821,7 +1010,7 @@ class TestPmsReservations(TestPms):
         )
         agency = self.env["res.partner"].create(
             {
-                "name": "partner1",
+                "firstname": "partner1",
                 "is_agency": True,
                 "sale_channel_id": sale_channel1.id,
                 "invoice_to_agency": "always",
@@ -1867,7 +1056,7 @@ class TestPmsReservations(TestPms):
         )
         agency = self.env["res.partner"].create(
             {
-                "name": "partner1",
+                "firstname": "partner1",
                 "is_agency": True,
                 "sale_channel_id": sale_channel1.id,
                 "apply_pricelist": True,
@@ -1924,7 +1113,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Miguel",
+                "firstname": "Miguel",
                 "mobile": "654667733",
                 "email": "miguel@example.com",
                 "birthdate_date": "1995-12-10",
@@ -1937,11 +1126,12 @@ class TestPmsReservations(TestPms):
                 "name": "30065000H",
                 "valid_from": datetime.date.today(),
                 "partner_id": self.host1.id,
+                "country_id": self.env.ref("base.es").id,
             }
         )
         self.host2 = self.env["res.partner"].create(
             {
-                "name": "Brais",
+                "firstname": "Brais",
                 "mobile": "654437733",
                 "email": "brais@example.com",
                 "birthdate_date": "1995-12-10",
@@ -1954,6 +1144,7 @@ class TestPmsReservations(TestPms):
                 "name": "30065089H",
                 "valid_from": datetime.date.today(),
                 "partner_id": self.host2.id,
+                "country_id": self.env.ref("base.es").id,
             }
         )
         self.reservation = self.env["pms.reservation"].create(
@@ -1999,7 +1190,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         with self.assertRaises(UserError):
@@ -2025,7 +1216,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         with self.assertRaises(ValidationError):
@@ -2051,7 +1242,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         with self.assertRaises(ValidationError):
@@ -2075,7 +1266,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         with self.assertRaises(ValidationError):
@@ -2108,7 +1299,7 @@ class TestPmsReservations(TestPms):
         )
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         self.room_type_double.pms_property_ids = [
@@ -2138,7 +1329,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         self.reservation = self.env["pms.reservation"].create(
@@ -2173,7 +1364,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         self.reservation = self.env["pms.reservation"].create(
@@ -2203,7 +1394,7 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
         reservation = self.env["pms.reservation"].create(
@@ -2250,7 +1441,7 @@ class TestPmsReservations(TestPms):
         )
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
 
@@ -2305,7 +1496,7 @@ class TestPmsReservations(TestPms):
         )
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
 
@@ -2359,7 +1550,7 @@ class TestPmsReservations(TestPms):
         )
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Host1",
+                "firstname": "Host1",
             }
         )
 
@@ -2390,14 +1581,14 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Miguel",
+                "firstname": "Miguel",
                 "mobile": "654667733",
                 "email": "miguel@example.com",
             }
         )
         self.host2 = self.env["res.partner"].create(
             {
-                "name": "Brais",
+                "firstname": "Brais",
                 "mobile": "654437733",
                 "email": "brais@example.com",
             }
@@ -2451,14 +1642,14 @@ class TestPmsReservations(TestPms):
         """
         self.host1 = self.env["res.partner"].create(
             {
-                "name": "Miguel",
+                "firstname": "Miguel",
                 "mobile": "654667733",
                 "email": "miguel@example.com",
             }
         )
         self.host2 = self.env["res.partner"].create(
             {
-                "name": "Brais",
+                "firstname": "Brais",
                 "mobile": "654437733",
                 "email": "brais@example.com",
             }
@@ -2513,7 +1704,7 @@ class TestPmsReservations(TestPms):
         """
         host = self.env["res.partner"].create(
             {
-                "name": "Miguel",
+                "firstname": "Miguel",
                 "mobile": "654667733",
                 "email": "miguel@example.com",
             }
@@ -2587,7 +1778,7 @@ class TestPmsReservations(TestPms):
         )
         agency = self.env["res.partner"].create(
             {
-                "name": "partner1",
+                "firstname": "partner1",
                 "is_agency": True,
                 "sale_channel_id": sale_channel1.id,
             }
@@ -3053,7 +2244,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         checkin = fields.date.today()
         checkout = fields.date.today() + datetime.timedelta(days=3)
-        self.partner1 = self.env["res.partner"].create({"name": "Ana"})
+        self.partner1 = self.env["res.partner"].create({"firstname": "Ana"})
         folio1 = self.env["pms.folio"].create(
             {
                 "pms_property_id": self.pms_property1.id,
@@ -3269,7 +2460,7 @@ class TestPmsReservations(TestPms):
         'staff'.
         """
         # ARRANGE AND ACT
-        self.partner1 = self.env["res.partner"].create({"name": "Ana"})
+        self.partner1 = self.env["res.partner"].create({"firstname": "Ana"})
         folio1 = self.env["pms.folio"].create(
             {
                 "pms_property_id": self.pms_property1.id,
@@ -3379,7 +2570,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         partner = self.env["res.partner"].create(
             {
-                "name": "Enrique",
+                "firstname": "Enrique",
                 "mobile": "654667733",
                 "email": "enrique@example.com",
             }
@@ -3430,7 +2621,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         partner = self.env["res.partner"].create(
             {
-                "name": "Simon",
+                "firstname": "Simon",
                 "mobile": "654667733",
                 "email": "simon@example.com",
             }
@@ -3479,7 +2670,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         partner = self.env["res.partner"].create(
             {
-                "name": "Courtney Campbell",
+                "firstname": "Courtney Campbell",
                 "email": "courtney@example.com",
             }
         )
@@ -3517,7 +2708,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         partner = self.env["res.partner"].create(
             {
-                "name": "Ledicia Sandoval",
+                "firstname": "Ledicia Sandoval",
                 "mobile": "615369231",
             }
         )
@@ -3557,7 +2748,7 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         partner = self.env["res.partner"].create(
             {
-                "name": "Serafín Rivas",
+                "firstname": "Serafín Rivas",
                 "email": "serafin@example.com",
                 "mobile": "60595595",
             }
@@ -3607,14 +2798,14 @@ class TestPmsReservations(TestPms):
         # ARRANGE
         partner1 = self.env["res.partner"].create(
             {
-                "name": "Serafín Rivas",
+                "firstname": "Serafín Rivas",
                 "email": "serafin@example.com",
                 "mobile": "60595595",
             }
         )
         partner2 = self.env["res.partner"].create(
             {
-                "name": "Simon",
+                "firstname": "Simon",
                 "mobile": "654667733",
                 "email": "simon@example.com",
             }

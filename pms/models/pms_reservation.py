@@ -38,12 +38,6 @@ class PmsReservation(models.Model):
         help="Techinal field to get reservation name",
         readonly=True,
     )
-    priority = fields.Integer(
-        string="Priority",
-        help="Priority of a reservation",
-        store="True",
-        compute="_compute_priority",
-    )
     preferred_room_id = fields.Many2one(
         string="Room",
         help="It's the preferred room assigned to reservation, "
@@ -184,7 +178,6 @@ class PmsReservation(models.Model):
         help="Property to which the reservation belongs",
         store=True,
         readonly=False,
-        default=lambda self: self.env.user.get_active_property_ids()[0],
         related="folio_id.pms_property_id",
         comodel_name="pms.property",
         index=True,
@@ -595,11 +588,6 @@ class PmsReservation(models.Model):
         column2="account_analytic_tag_id",
         domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",
     )
-    analytic_line_ids = fields.One2many(
-        string="Analytic lines",
-        comodel_name="account.analytic.line",
-        inverse_name="so_line",
-    )
     price_subtotal = fields.Monetary(
         string="Subtotal",
         help="Subtotal price without taxes",
@@ -771,81 +759,28 @@ class PmsReservation(models.Model):
         for record in self:
             record.check_adults = True
 
-    @api.depends(
-        "checkin",
-        "checkout",
-        "state",
-        "folio_payment_state",
-        "to_assign",
-    )
-    def _compute_priority(self):
-        # TODO: Notifications priority
-        for record in self:
-            if record.to_assign or record.state in (
-                "arrival_delayed",
-                "departure_delayed",
-            ):
-                record.priority = 1
-            elif record.state == "cancel":
-                record.priority = record.cancel_priority()
-            elif record.state == "onboard":
-                record.priority = record.onboard_priority()
-            elif record.state in ("draf", "confirm"):
-                record.priority = record.reservations_future_priority()
-            elif record.state == "done":
-                record.priority = record.reservations_past_priority()
-
-    def cancel_priority(self):
-        self.ensure_one()
-        if self.folio_pending_amount > 0:
-            return 2
-        elif self.checkout >= fields.date.today():
-            return 100
-        else:
-            return 1000 * (fields.date.today() - self.checkout).days
-
-    def onboard_priority(self):
-        self.ensure_one()
-        days_for_checkout = (self.checkout - fields.date.today()).days
-        if self.folio_pending_amount > 0:
-            return days_for_checkout
-        else:
-            return 3 * days_for_checkout
-
-    def reservations_future_priority(self):
-        self.ensure_one()
-        days_for_checkin = (self.checkin - fields.date.today()).days
-        if days_for_checkin < 3:
-            return 2 * days_for_checkin
-        elif days_for_checkin < 20:
-            return 3 * days_for_checkin
-        else:
-            return 4 * days_for_checkin
-
-    def reservations_past_priority(self):
-        self.ensure_one()
-        if self.folio_pending_amount > 0:
-            return 3
-        days_from_checkout = (fields.date.today() - self.checkout).days
-        if days_from_checkout <= 1:
-            return 6
-        elif days_from_checkout < 15:
-            return 5 * days_from_checkout
-        elif days_from_checkout <= 90:
-            return 10 * days_from_checkout
-        elif days_from_checkout > 90:
-            return 100 * days_from_checkout
-
     @api.depends("pricelist_id", "room_type_id")
     def _compute_board_service_room_id(self):
         for reservation in self:
             if reservation.pricelist_id and reservation.room_type_id:
-                board_service_default = self.env["pms.board.service.room.type"].search(
+                board_services_candidates = self.env[
+                    "pms.board.service.room.type"
+                ].search(
                     [
                         ("pms_room_type_id", "=", reservation.room_type_id.id),
                         ("by_default", "=", True),
                         ("pms_property_id", "=", reservation.pms_property_id.id),
                     ]
+                )
+                board_service_default = (
+                    board_services_candidates.filtered(
+                        lambda service: reservation.pricelist_id
+                        in service.pricelist_ids
+                    )
+                    or board_services_candidates.filtered(
+                        lambda service: not service.pricelist_ids
+                    )
+                    or False
                 )
                 if (
                     not reservation.board_service_room_id
@@ -924,9 +859,11 @@ class PmsReservation(models.Model):
                     room_type_id=False,  # Allows to choose any available room
                     current_lines=reservation.reservation_line_ids.ids,
                     pricelist_id=reservation.pricelist_id.id,
-                    class_id=reservation.room_type_id.class_id.id
-                    if reservation.room_type_id
-                    else False,
+                    class_id=(
+                        reservation.room_type_id.class_id.id
+                        if reservation.room_type_id
+                        else False
+                    ),
                     real_avail=True,
                 )
                 reservation.allowed_room_ids = pms_property.free_room_ids
@@ -1093,10 +1030,14 @@ class PmsReservation(models.Model):
             else:
                 reservation.show_update_pricelist = False
 
-    @api.depends("adults")
+    @api.depends("adults", "children")
     def _compute_checkin_partner_ids(self):
         for reservation in self:
-            adults = reservation.adults if reservation.reservation_type != "out" else 0
+            occupancy = (
+                reservation.adults + reservation.children
+                if reservation.reservation_type != "out"
+                else 0
+            )
             assigned_checkins = reservation.checkin_partner_ids.filtered(
                 lambda c: c.state in ("precheckin", "onboard", "done")
             )
@@ -1104,18 +1045,18 @@ class PmsReservation(models.Model):
                 lambda c: c.state in ("dummy", "draft")
             )
             leftover_unassigneds_count = (
-                len(assigned_checkins) + len(unassigned_checkins) - adults
+                len(assigned_checkins) + len(unassigned_checkins) - occupancy
             )
-            if len(assigned_checkins) > adults:
+            if len(assigned_checkins) > occupancy:
                 raise UserError(
                     _("Remove some of the leftover assigned checkins first")
                 )
             elif leftover_unassigneds_count > 0:
                 for i in range(0, leftover_unassigneds_count):
                     reservation.checkin_partner_ids = [(2, unassigned_checkins[i].id)]
-            elif adults > len(reservation.checkin_partner_ids):
+            elif occupancy > len(reservation.checkin_partner_ids):
                 checkins_lst = []
-                count_new_checkins = adults - len(reservation.checkin_partner_ids)
+                count_new_checkins = occupancy - len(reservation.checkin_partner_ids)
                 for _i in range(0, count_new_checkins):
                     checkins_lst.append(
                         (
@@ -1127,7 +1068,7 @@ class PmsReservation(models.Model):
                         )
                     )
                 reservation.checkin_partner_ids = checkins_lst
-            elif adults == 0:
+            elif occupancy == 0:
                 reservation.checkin_partner_ids = False
 
     @api.depends("checkin_partner_ids", "checkin_partner_ids.state")
@@ -1142,11 +1083,10 @@ class PmsReservation(models.Model):
     @api.depends("count_pending_arrival")
     def _compute_checkins_ratio(self):
         self.checkins_ratio = 0
-        for reservation in self.filtered(lambda r: r.adults > 0):
+        for reservation in self.filtered(lambda r: (r.adults + r.children) > 0):
+            occupancy = reservation.adults + reservation.children
             reservation.checkins_ratio = (
-                (reservation.adults - reservation.count_pending_arrival)
-                * 100
-                / reservation.adults
+                (occupancy - reservation.count_pending_arrival) * 100 / occupancy
             )
 
     @api.depends("checkin_partner_ids", "checkin_partner_ids.state")
@@ -1162,12 +1102,11 @@ class PmsReservation(models.Model):
     def _compute_ratio_checkin_data(self):
         self.ratio_checkin_data = 0
         for reservation in self.filtered(
-            lambda r: r.adults > 0 and r.state != "cancel"
+            lambda r: (r.adults + r.children) > 0 and r.state != "cancel"
         ):
+            occupancy = reservation.adults + reservation.children
             reservation.ratio_checkin_data = (
-                (reservation.adults - reservation.pending_checkin_data)
-                * 100
-                / reservation.adults
+                (occupancy - reservation.pending_checkin_data) * 100 / occupancy
             )
 
     def _compute_allowed_checkin(self):
@@ -1547,24 +1486,31 @@ class PmsReservation(models.Model):
     def _compute_checkin_partner_count(self):
         for record in self:
             if record.reservation_type != "out" and record.overnight_room:
+                occupancy = record.adults + record.children
                 record.checkin_partner_count = len(record.checkin_partner_ids)
-                record.checkin_partner_pending_count = record.adults - len(
+                record.checkin_partner_pending_count = occupancy - len(
                     record.checkin_partner_ids
                 )
             else:
                 record.checkin_partner_count = 0
                 record.checkin_partner_pending_count = 0
 
-    @api.depends("room_type_id")
+    @api.depends("room_type_id", "partner_id")
     def _compute_tax_ids(self):
         for record in self:
             record = record.with_company(record.company_id)
-            product = self.env["product.product"].browse(
-                record.room_type_id.product_id.id
-            )
-            record.tax_ids = product.taxes_id.filtered(
-                lambda t: t.company_id == record.env.company
-            )
+            if (
+                record.partner_id == record.company_id.partner_id
+                and record.company_id.self_billed_tax_ids
+            ):
+                record.tax_ids = record.company_id.self_billed_tax_ids
+            else:
+                product = self.env["product.product"].browse(
+                    record.room_type_id.product_id.id
+                )
+                record.tax_ids = product.taxes_id.filtered(
+                    lambda t: t.company_id == record.env.company
+                )
 
     @api.depends("reservation_line_ids", "reservation_line_ids.room_id")
     def _compute_rooms(self):
@@ -1736,7 +1682,9 @@ class PmsReservation(models.Model):
         return [
             ("state", "in", ("draft", "confirm", "arrival_delayed")),
             ("checkin", "<=", today),
+            "|",
             ("adults", ">", 0),
+            ("children", ">", 0),
         ]
 
     def _search_allowed_checkout(self, operator, value):
@@ -1754,7 +1702,9 @@ class PmsReservation(models.Model):
         return [
             ("state", "in", ("onboard", "departure_delayed")),
             ("checkout", ">=", today),
+            "|",
             ("adults", ">", 0),
+            ("children", ">", 0),
         ]
 
     def _search_allowed_cancel(self, operator, value):
@@ -2152,6 +2102,13 @@ class PmsReservation(models.Model):
             record.action_cancel()
 
         record._check_services(vals)
+        tourist_tax_services_cmds = record._compute_tourist_tax_lines()
+        if tourist_tax_services_cmds:
+            record.write(
+                {
+                    "service_ids": tourist_tax_services_cmds,
+                }
+            )
         return record
 
     def write(self, vals):
@@ -2216,11 +2173,20 @@ class PmsReservation(models.Model):
                 "sale_channel_origin_id"
             ]
 
-        self._check_services(vals)
-        # Only check if adult to avoid to check capacity in intermediate states (p.e. flush)
-        # that not take access to possible extra beds service in vals
-        if "adults" in vals:
-            self._check_capacity()
+        for record in self:
+            record._check_services(vals)
+            # Only check if adult to avoid to check capacity in intermediate states (p.e. flush)
+            # that not take access to possible extra beds service in vals
+            if "adults" in vals:
+                record._check_capacity()
+            if (
+                "checkin" in vals
+                or "checkout" in vals
+                or "reservation_line_ids" in vals
+            ):
+                tourist_tax_services_cmds = record._compute_tourist_tax_lines()
+                if tourist_tax_services_cmds:
+                    record.write({"service_ids": tourist_tax_services_cmds})
         return res
 
     def _get_folio_vals(self, reservation_vals):
@@ -2326,12 +2292,6 @@ class PmsReservation(models.Model):
             reservation.message_post(
                 subject=_("No Checkins!"), subtype="mt_comment", body=msg
             )
-        return True
-
-    @api.model
-    def update_daily_priority_reservation(self):
-        reservations = self.env["pms.reservation"].search([("priority", "<", 1000)])
-        reservations._compute_priority()
         return True
 
     def action_confirm(self):
@@ -2575,3 +2535,185 @@ class PmsReservation(models.Model):
             "target": "self",
             "url": self.get_portal_url(),
         }
+
+    def _compute_tourist_tax_lines(self):
+        """Return ORM commands to sync tourist tax services on this reservation."""
+        self.ensure_one()
+
+        tax_products = self._get_tourist_tax_products()
+        if not tax_products:
+            return []
+
+        nightly_dates = self._get_nightly_dates()
+        grouped_lines = self._build_grouped_tax_lines(tax_products, nightly_dates)
+        existing_services = self._get_existing_tourist_tax_services()
+        return self._build_service_commands(grouped_lines, existing_services)
+
+    def _get_tourist_tax_products(self):
+        return self.env["product.product"].search([("is_tourist_tax", "=", True)])
+
+    def _get_nightly_dates(self):
+        return [
+            self.checkin + datetime.timedelta(days=i)
+            for i in range((self.checkout - self.checkin).days)
+        ]
+
+    def _build_grouped_tax_lines(self, products, nightly_dates):
+        grouped = {}
+        for night_index, night_date in enumerate(nightly_dates):
+            night_number = night_index + 1
+            for product in products:
+                if not self._should_apply_product_for_night(
+                    product, night_date, night_number
+                ):
+                    continue
+
+                quantity = (
+                    self._get_applicable_guest_count(product)
+                    if product.per_person
+                    else 1
+                )
+                price_unit = self._get_product_price(product, quantity, night_date)
+                key = (product.id, price_unit)
+
+                line = {
+                    "product_id": product.id,
+                    "day_qty": quantity,
+                    "price_unit": price_unit,
+                    "date": night_date,
+                }
+                grouped.setdefault(key, []).append(line)
+        return grouped
+
+    def _should_apply_product_for_night(self, product, night_date, night_number):
+        return (
+            self._is_mmdd_in_range(
+                night_date, product.tourist_tax_date_start, product.tourist_tax_date_end
+            )
+            and night_number >= product.tourist_tax_apply_from_night
+            and (
+                not product.tourist_tax_apply_to_night
+                or night_number <= product.tourist_tax_apply_to_night
+            )
+        )
+
+    def _get_applicable_guest_count(self, product):
+        return len(
+            self._get_guests_by_age(
+                product.tourist_tax_min_age,
+                product.tourist_tax_max_age,
+            )
+        )
+
+    def _get_product_price(self, product, quantity, night_date):
+        priced = product.with_context(
+            lang=self.partner_id.lang,
+            partner=self.partner_id.id,
+            quantity=quantity,
+            date=fields.Date.today(),
+            consumption_date=night_date,
+            pricelist=self.pricelist_id.id,
+            uom=product.uom_id.id,
+            property=self.pms_property_id.id,
+        )
+        return self.env["account.tax"]._fix_tax_included_price_company(
+            priced.price,
+            priced.taxes_id,
+            self.tax_ids,
+            self.pms_property_id.company_id,
+        )
+
+    def _get_existing_tourist_tax_services(self):
+        return self.service_ids.filtered(
+            lambda s: s.product_id.product_tmpl_id.is_tourist_tax
+        )
+
+    def _build_service_commands(self, grouped_lines, existing_services):
+        cmds = []
+        existing_by_product = {s.product_id.id: s for s in existing_services}
+        new_product_ids = {product_id for product_id, _ in grouped_lines}
+
+        # Remove services no longer needed
+        for product_id in existing_by_product.keys() - new_product_ids:
+            cmds.append((2, existing_by_product[product_id].id))
+
+        for (product_id, _price_unit), new_lines in grouped_lines.items():
+            product = self.env["product.product"].browse(product_id)
+            service = existing_by_product.get(product_id)
+
+            if not service:
+                cmds.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "reservation_id": self.id,
+                            "folio_id": self.folio_id.id,
+                            "product_id": product.id,
+                            "name": product.name,
+                            "per_day": True,
+                            "service_line_ids": [(0, 0, line) for line in new_lines],
+                        },
+                    )
+                )
+            else:
+                existing_lines = {line.date: line for line in service.service_line_ids}
+                new_lines_by_date = {line["date"]: line for line in new_lines}
+                line_cmds = []
+
+                for date in existing_lines.keys() & new_lines_by_date.keys():
+                    existing = existing_lines[date]
+                    new = new_lines_by_date[date]
+                    if (
+                        existing.day_qty != new["day_qty"]
+                        or existing.price_unit != new["price_unit"]
+                    ):
+                        line_cmds.append(
+                            (
+                                1,
+                                existing.id,
+                                {
+                                    "day_qty": new["day_qty"],
+                                    "price_unit": new["price_unit"],
+                                },
+                            )
+                        )
+                for date in existing_lines.keys() - new_lines_by_date.keys():
+                    line_cmds.append((2, existing_lines[date].id))
+                for date in new_lines_by_date.keys() - existing_lines.keys():
+                    line_cmds.append((0, 0, new_lines_by_date[date]))
+
+                if line_cmds:
+                    cmds.append((1, service.id, {"service_line_ids": line_cmds}))
+
+        return cmds
+
+    def _get_guests_by_age(self, min_age=None, max_age=None):
+        today = fields.Date.today()
+        guests = self.checkin_partner_ids
+
+        def age(birthdate):
+            return (today - birthdate).days // 365 if birthdate else 0
+
+        filtered = guests.filtered(
+            lambda g: (
+                (not min_age or age(g.birthdate_date) >= min_age)
+                and (not max_age or age(g.birthdate_date) <= max_age)
+            )
+        )
+        return filtered
+
+    def _is_mmdd_in_range(self, check_date, start_mmdd, end_mmdd):
+        """Check if a date falls between two MM-DD values,
+        supporting wrap-around (e.g. Nov–Feb)."""
+        if not start_mmdd or not end_mmdd:
+            return True
+
+        check_md = (check_date.month, check_date.day)
+        start_md = tuple(map(int, start_mmdd.split("-")))
+        end_md = tuple(map(int, end_mmdd.split("-")))
+
+        if start_md <= end_md:
+            return start_md <= check_md <= end_md
+        else:
+            return check_md >= start_md or check_md <= end_md
